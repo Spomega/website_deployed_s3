@@ -1,0 +1,98 @@
+name: Terraform deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Terraform environment to manage
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      action:
+        description: Terraform operation to run
+        required: true
+        type: choice
+        default: plan
+        options:
+          - plan
+          - apply
+          - destroy
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: terraform-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  terraform:
+    name: ${{ inputs.action }} ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      TF_VAR_aws_profile: ""
+      AWS_REGION: ${{ vars.AWS_REGION || 'eu-central-1' }}
+      AWS_ROLE_TO_ASSUME: ${{ vars.AWS_ROLE_TO_ASSUME }}
+      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+      TF_DIR: environments/${{ inputs.environment }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify deployment configuration
+        shell: bash
+        run: |
+          test -n "$AWS_ROLE_TO_ASSUME" || { echo "Set AWS_ROLE_TO_ASSUME for this GitHub Environment."; exit 1; }
+          test -n "$TF_STATE_BUCKET" || { echo "Set TF_STATE_BUCKET for this GitHub Environment."; exit 1; }
+
+      - name: Configure AWS credentials with OIDC
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Initialize Terraform backend
+        run: terraform -chdir="$TF_DIR" init -input=false -reconfigure -backend-config="bucket=$TF_STATE_BUCKET"
+
+      - name: Validate Terraform configuration
+        run: terraform -chdir="$TF_DIR" validate -no-color
+
+      - name: Create plan
+        if: inputs.action == 'plan' || inputs.action == 'apply'
+        run: terraform -chdir="$TF_DIR" plan -input=false -no-color -out=tfplan
+
+      - name: Create destroy plan
+        if: inputs.action == 'destroy'
+        run: terraform -chdir="$TF_DIR" plan -destroy -input=false -no-color -out=destroy.tfplan
+
+      - name: Apply plan
+        if: inputs.action == 'apply'
+        run: terraform -chdir="$TF_DIR" apply -input=false -no-color tfplan
+
+      - name: Apply destroy plan
+        if: inputs.action == 'destroy'
+        run: terraform -chdir="$TF_DIR" apply -input=false -no-color destroy.tfplan
+
+      - name: Publish Terraform outputs
+        if: inputs.action == 'apply'
+        run: |
+          {
+            echo "## Terraform outputs"
+            echo '```text'
+            terraform -chdir="$TF_DIR" output -no-color
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

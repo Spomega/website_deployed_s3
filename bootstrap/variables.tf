@@ -15,6 +15,40 @@ variable "state_bucket_name" {
   type        = string
 }
 
+variable "github_repository" {
+  description = "GitHub repository allowed to assume the deployment role, in OWNER/REPOSITORY format."
+  type        = string
+  default     = "Spomega/website_deployed_s3"
+
+  validation {
+    condition     = can(regex("^[^/]+/[^/]+$", var.github_repository))
+    error_message = "github_repository must use the OWNER/REPOSITORY format."
+  }
+}
+
+variable "github_environments" {
+  description = "GitHub Environments allowed to assume the deployment role."
+  type        = set(string)
+  default     = ["dev", "staging", "prod"]
+
+  validation {
+    condition     = alltrue([for environment in var.github_environments : contains(["dev", "staging", "prod"], environment)])
+    error_message = "github_environments can contain only dev, staging, and prod."
+  }
+}
+
+variable "github_actions_role_name" {
+  description = "Name of the IAM role GitHub Actions assumes for Terraform deployments."
+  type        = string
+  default     = "github-actions-website-deploy"
+}
+
+variable "website_project_name" {
+  description = "Project name used to scope website bucket permissions."
+  type        = string
+  default     = "kojo-profile"
+}
+
 variable "common_tags" {
   description = "Tags applied to supported bootstrap resources."
   type        = map(string)
