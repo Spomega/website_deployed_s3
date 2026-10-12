@@ -1,0 +1,2 @@
+# Replace the suffix with a unique value before applying bootstrap.
+state_bucket_name = "kojo-terraform-state-replace-with-unique-suffix"

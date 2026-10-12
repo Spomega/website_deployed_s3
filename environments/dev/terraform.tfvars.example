@@ -1,0 +1,8 @@
+aws_region   = "eu-central-1"
+aws_profile  = "spomega"
+project_name = "kojo-profile"
+environment  = "dev"
+
+common_tags = {
+  Owner = "Kojo Mensah"
+}
