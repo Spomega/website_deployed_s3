@@ -49,7 +49,7 @@ data "aws_iam_policy_document" "github_actions_assume_role" {
       variable = "token.actions.githubusercontent.com:sub"
       values = [
         for environment in var.github_environments :
-        "repo:${var.github_repository}:environment:${environment}"
+        "repo:Spomega@3873072/website_deployed_s3@1416118771:environment:${environment}"
       ]
     }
   }
@@ -147,7 +147,9 @@ data "aws_iam_policy_document" "github_actions_deploy" {
       "cloudfront:GetOriginAccessControl",
       "cloudfront:GetResponseHeadersPolicy",
       "cloudfront:ListDistributions",
+      "cloudfront:ListCachePolicies",
       "cloudfront:ListOriginAccessControls",
+      "cloudfront:ListResponseHeadersPolicies",
       "cloudfront:ListTagsForResource",
       "cloudfront:TagResource",
       "cloudfront:UntagResource",
